@@ -106,8 +106,12 @@
       "apiVersion": "2022-01-02-preview",
       "type": "Microsoft.ContainerService/managedClusters",
       "location": "[parameters('location')]",
-      "name": "[parameters('clusterName')]",
+      "name": "[concat(copyIndex(),'aks', uniqueString(resourceGroup().id))]",
       "tags": "[parameters('resourceTags')]",
+      "copy":{
+        "name": "akscopy",
+        "count": 2
+      },
       "properties": {
         "kubernetesVersion": "[parameters('kubernetesVersion')]",
         "enableRBAC": "[parameters('enableRBAC')]",
@@ -148,11 +152,5 @@
         }
       }
     }
-  ],
-  "outputs": {
-    "controlPlaneFQDN": {
-      "type": "string",
-      "value": "[reference(parameters('clusterName')).fqdn]"
-    }
-  }
+  ]
 }

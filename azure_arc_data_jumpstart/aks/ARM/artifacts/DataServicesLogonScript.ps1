@@ -48,6 +48,17 @@ $Shortcut = $WScriptShell.CreateShortcut($ShortcutFile)
 $Shortcut.TargetPath = $TargetFile
 $Shortcut.Save()
 
+# Creating Microsoft SQL Server Management Studio (SSMS) desktop shortcut
+Write-Host "`n"
+Write-Host "Creating Microsoft SQL Server Management Studio (SSMS) desktop shortcut"
+Write-Host "`n"
+$TargetFile = "C:\Program Files (x86)\Microsoft SQL Server Management Studio 18\Common7\IDE\ssms.exe"
+$ShortcutFile = "C:\Users\$Env:adminUsername\Desktop\Microsoft SQL Server Management Studio 18.lnk"
+$WScriptShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WScriptShell.CreateShortcut($ShortcutFile)
+$Shortcut.TargetPath = $TargetFile
+$Shortcut.Save()
+
 # Registering Azure Arc providers
 Write-Host "Registering Azure Arc providers, hold tight..."
 Write-Host "`n"
@@ -137,6 +148,7 @@ function Arc-Onboarding {
     foreach ($aksCluster in $aksArray)
     {
         kubectx $aksCluster
+        Write-Host "`n"
         $Env:KUBECONTEXT = kubectl config current-context
         # Create Kubernetes - Azure Arc Cluster
         az connectedk8s connect --name $aksCluster `

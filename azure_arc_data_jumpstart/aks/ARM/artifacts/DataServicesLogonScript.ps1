@@ -2,7 +2,6 @@ Start-Transcript -Path C:\Temp\DataServicesLogonScript.log
 
 # Deployment environment variables
 $Env:TempDir = "C:\Temp"
-# $connectedClusterName = "Arc-DataSvc-AKS"
 
 Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
 
@@ -49,7 +48,7 @@ $Shortcut = $WScriptShell.CreateShortcut($ShortcutFile)
 $Shortcut.TargetPath = $TargetFile
 $Shortcut.Save()
 
-Registering Azure Arc providers
+# Registering Azure Arc providers
 Write-Host "Registering Azure Arc providers, hold tight..."
 Write-Host "`n"
 az provider register --namespace Microsoft.Kubernetes --wait
@@ -66,6 +65,7 @@ Write-Host "`n"
 az provider show --namespace Microsoft.AzureArcData -o table
 Write-Host "`n"
 
+New-Item -ItemType "directory" -Path "C:\Users\$Env:adminUsername\.kube"
 Push-Location "C:\Users\$Env:adminUsername\.kube"
 
 # Localize kubeconfig
@@ -134,7 +134,8 @@ function Arc-Onboarding {
         PowerShell function for changing Kubernetes cluster context to a friendly name using kubectx.
     #>
     $aksArray = $(az resource list --resource-group $Env:resourceGroup --resource-type "Microsoft.ContainerService/managedClusters" --query "[].name" -o tsv)
-    foreach ($aksCluster in $aksArray){
+    foreach ($aksCluster in $aksArray)
+    {
         kubectx $aksCluster
         $Env:KUBECONTEXT = kubectl config current-context
         # Create Kubernetes - Azure Arc Cluster
@@ -149,10 +150,34 @@ function Arc-Onboarding {
 # Run function
 Arc-Onboarding
 
+# workflow Arc-Onboarding
+# {
+#     $aksArray = $(az resource list --resource-group $Env:resourceGroup --resource-type "Microsoft.ContainerService/managedClusters" --query "[].name" -o tsv)
+
+#     # The disks are processed in parallel.
+#     ForEach -Parallel ($aksCluster in $aksArray)
+#     {
+#         # The commands run sequentially on each cluster.
+#         kubectx $aksCluster
+#         $Env:KUBECONTEXT = kubectl config current-context
+#         # Create Kubernetes - Azure Arc Cluster
+#         az connectedk8s connect --name $aksCluster `
+#             --resource-group $Env:resourceGroup `
+#             --location $Env:azureLocation `
+#             --tags 'Project=jumpstart_azure_arc_data_services' `
+#             --kube-config $Env:KUBECONFIG `
+#             --kube-context $Env:KUBECONTEXT
+#     }
+# }
+
+# # Run workflow
+# Arc-Onboarding
+
 Push-Location "C:\Users\$Env:adminUsername"
 
 # Defining the Azure Arc-enabled data services target Arc-connected Kubernetes cluster
 $connectedClusterName = $(az resource list --resource-group $Env:resourceGroup --resource-type "Microsoft.ContainerService/managedClusters" --query "[].name" -o tsv | Select-String 0)
+kubectx $connectedClusterName
 # Start-Sleep -Seconds 10
 
 # Enabling Container Insights cluster extension

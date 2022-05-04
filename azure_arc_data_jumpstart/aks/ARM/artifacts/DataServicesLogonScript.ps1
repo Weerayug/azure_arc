@@ -2,7 +2,7 @@ Start-Transcript -Path C:\Temp\DataServicesLogonScript.log
 
 # Deployment environment variables
 $Env:TempDir = "C:\Temp"
-$connectedClusterName = "Arc-DataSvc-AKS"
+# $connectedClusterName = "Arc-DataSvc-AKS"
 
 Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
 
@@ -49,7 +49,7 @@ $Shortcut = $WScriptShell.CreateShortcut($ShortcutFile)
 $Shortcut.TargetPath = $TargetFile
 $Shortcut.Save()
 
-# Registering Azure Arc providers
+Registering Azure Arc providers
 Write-Host "Registering Azure Arc providers, hold tight..."
 Write-Host "`n"
 az provider register --namespace Microsoft.Kubernetes --wait
@@ -66,11 +66,54 @@ Write-Host "`n"
 az provider show --namespace Microsoft.AzureArcData -o table
 Write-Host "`n"
 
-# Getting AKS cluster credentials kubeconfig file
-Write-Host "Getting AKS cluster credentials"
-Write-Host "`n"
-az aks get-credentials --resource-group $Env:resourceGroup `
-                       --name $Env:clusterName --admin
+Push-Location "C:\Users\$Env:adminUsername\.kube"
+
+# Localize kubeconfig
+$Env:KUBECONFIG = "C:\Users\$Env:adminUsername\.kube\config"
+
+function Get-AKSCreds {
+    <#
+        .SYNOPSIS
+        PowerShell function for getting AKS cluster credentials kubeconfig file
+        
+        .DESCRIPTION
+        PowerShell function for getting AKS cluster credentials kubeconfig file.
+    #>
+    Write-Host "`n"
+    Write-Host "Getting AKS cluster credentials"
+    Write-Host "`n"
+    $aksArray = $(az resource list --resource-group $Env:resourceGroup --resource-type "Microsoft.ContainerService/managedClusters" --query "[].name" -o tsv)
+    foreach ($aksCluster in $aksArray){
+        az aks get-credentials --resource-group $Env:resourceGroup `
+                               --name $aksCluster --admin
+    }
+}
+# Run function
+Get-AKSCreds
+
+# Changing default _get-credentials_ output kubeconfig file name
+Rename-Item "C:\Users\$Env:adminUsername\.kube\C" "$Env:KUBECONFIG"
+
+function Change-AKSContext {
+    <#
+        .SYNOPSIS
+        PowerShell function for changing Kubernetes cluster context name
+        
+        .DESCRIPTION
+        PowerShell function for changing Kubernetes cluster context to a friendly name using kubectx.
+    #>
+    Write-Host "`n"
+    Write-Host "Changing AKS cluster context name"
+    Write-Host "`n"
+    $aksArray = $(az resource list --resource-group $Env:resourceGroup --resource-type "Microsoft.ContainerService/managedClusters" --query "[].name" -o tsv)
+    foreach ($aksCluster in $aksArray){
+        kubectx $aksCluster="$aksCluster-admin"
+    }
+}
+# Run function
+Change-AKSContext
+
+kubectx
 
 Write-Host "Checking kubernetes nodes"
 Write-Host "`n"
@@ -78,23 +121,39 @@ kubectl get nodes
 Write-Host "`n"
 
 # Onboarding the AKS cluster as an Azure Arc-enabled Kubernetes cluster
-Write-Host "Onboarding the cluster as an Azure Arc-enabled Kubernetes cluster"
+Write-Host "Onboarding the clusters as an Azure Arc-enabled Kubernetes clusters"
 Write-Host "`n"
 
-# Localize kubeconfig
-$Env:KUBECONTEXT = kubectl config current-context
-$Env:KUBECONFIG = "C:\Users\$Env:adminUsername\.kube\config"
-Start-Sleep -Seconds 10
 
-# Create Kubernetes - Azure Arc Cluster
-az connectedk8s connect --name $connectedClusterName `
-                        --resource-group $Env:resourceGroup `
-                        --location $Env:azureLocation `
-                        --tags 'Project=jumpstart_azure_arc_data_services' `
-                        --kube-config $Env:KUBECONFIG `
-                        --kube-context $Env:KUBECONTEXT
+function Arc-Onboarding {
+    <#
+        .SYNOPSIS
+        PowerShell function for onboarding the AKS clusters as Azure Arc-enabled Kubernetes clusters
+        
+        .DESCRIPTION
+        PowerShell function for changing Kubernetes cluster context to a friendly name using kubectx.
+    #>
+    $aksArray = $(az resource list --resource-group $Env:resourceGroup --resource-type "Microsoft.ContainerService/managedClusters" --query "[].name" -o tsv)
+    foreach ($aksCluster in $aksArray){
+        kubectx $aksCluster
+        $Env:KUBECONTEXT = kubectl config current-context
+        # Create Kubernetes - Azure Arc Cluster
+        az connectedk8s connect --name $aksCluster `
+            --resource-group $Env:resourceGroup `
+            --location $Env:azureLocation `
+            --tags 'Project=jumpstart_azure_arc_data_services' `
+            --kube-config $Env:KUBECONFIG `
+            --kube-context $Env:KUBECONTEXT
+    }
+}
+# Run function
+Arc-Onboarding
 
-Start-Sleep -Seconds 10
+Push-Location "C:\Users\$Env:adminUsername"
+
+# Defining the Azure Arc-enabled data services target Arc-connected Kubernetes cluster
+$connectedClusterName = $(az resource list --resource-group $Env:resourceGroup --resource-type "Microsoft.ContainerService/managedClusters" --query "[].name" -o tsv | Select-String 0)
+# Start-Sleep -Seconds 10
 
 # Enabling Container Insights cluster extension
 Write-Host "`n"

@@ -106,7 +106,7 @@
       "apiVersion": "2022-01-02-preview",
       "type": "Microsoft.ContainerService/managedClusters",
       "location": "[parameters('location')]",
-      "name": "[concat(copyIndex(),'aks', uniqueString(resourceGroup().id))]",
+      "name": "[concat(parameters('clusterName'),'-', copyIndex())]",
       "tags": "[parameters('resourceTags')]",
       "copy":{
         "name": "akscopy",
